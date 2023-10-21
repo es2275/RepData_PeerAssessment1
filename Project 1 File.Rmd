@@ -1,0 +1,102 @@
+---
+title: "Project 1"
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(readr)
+library(ggplot2)
+knitr::opts_chunk$set(echo = TRUE)
+include_graphics() 
+```
+
+## Loading and preprocessing the data
+setwd("~/Desktop")
+rawdata <- read.csv(file="activity.csv")
+rawdata$date <- as.Date(rawdata$date)
+
+# Calculate the total number of steps taken per day
+totalsteps<-aggregate(rawdata$steps, list(rawdata$date), sum, na.rm=TRUE)
+colnames(totalsteps) <- c("date", "steps")
+
+# If you do not understand the difference between a histogram and a barplot, research the difference between them. Make a histogram of the total number of steps taken each day
+plot1 <- hist(totalsteps$steps, main = "Total number of steps taken each day", col = "pink", xlab = "Number of Steps")
+plot1
+
+#Calculate and report the mean and median of the total number of steps taken per day
+library(dplyr)
+
+resultmean <- totalsteps %>% 
+  summarise(mean = mean(steps))
+
+resultmedian <- totalsteps %>% 
+  summarise(median = median(steps))
+
+## What is the average daily activity pattern?
+stepsinterval <- aggregate(steps ~ interval, rawdata, mean)
+
+# Make a time series plot (i.e. type = "l" type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+plot2<-ggplot(data=stepsinterval, aes(x=interval, y=steps)) +
+  geom_line() +
+  ylab(expression('Average Number of Steps')) +
+  ggtitle('Time Series Plot - Average Number of Steps Taken by Interval') 
+plot2
+
+# Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+maxinterval <- stepsinterval[which.max(totalsteps$steps), 1]
+maxvalue <- stepsinterval[which.max(totalsteps$steps), 2]
+
+## Imputing missing values
+
+# Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NA NAs)
+nomissingvalues <- sum(is.na (rawdata$steps)) 
+
+# Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+meaninterval <- rawdata %>%
+  group_by(interval) %>%
+  summarise(steps = mean(steps))
+
+# Create a new dataset that is equal to the original dataset but with the missing data filled in.
+imputed <- merge(rawdata, meaninterval, by = "interval", all.x = TRUE)
+imputed$steps <- ifelse(is.na(imputed$steps.x), imputed$steps.y, imputed$steps.x)
+imputed <- imputed[c("steps", "date", "interval")]
+colnames(imputed) <- c("steps", "date", "interval")
+
+
+# Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+stepsintervalimputed <- aggregate(steps ~ date, data = imputed, sum)
+hist(stepsintervalimputed$steps, main = "Total number of steps taken each day", col = "pink", xlab = "Number of Steps")
+
+meansteps2 <- mean(stepsintervalimputed$steps)
+mediansteps2 <- median(stepsintervalimputed$steps)
+
+# Print the mean and median
+print(paste("Mean steps:", meansteps2))
+print(paste("Median steps:", mediansteps2))
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+# Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+library(lubridate)
+
+imputed$noday <- wday(imputed$date)
+imputed$daytype <- ifelse(imputed$noday %in% c(1, 7), 'weekend', 'weekday')
+
+
+# Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). See the README file in the GitHub repository to see an example of what this plot should look like using simulated data.
+stepsday <- aggregate(steps ~ interval + daytype, data = imputed, mean)
+
+weekdaydata <- subset(stepsday, daytype == "weekday")
+weekenddata <- subset(stepsday, daytype == "weekend")
+
+# Create a time series plot
+plot3<-plot(weekdaydata$interval, weekdaydata$steps, type = "l", col = "blue",
+     xlab = "Interval", ylab = "Average step", main = "Time series plot of the average number of steps taken")
+lines(weekenddata$interval, weekenddata$steps, type = "l", col = "red")
+legend("topright", legend = c("Weekday", "Weekend"), col = c("blue", "red"), lty = 1)
+plot3
+
+pdf("Project1.pdf")
